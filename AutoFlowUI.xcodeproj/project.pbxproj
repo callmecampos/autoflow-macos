@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0903C2A1281C95920078E4F3 /* bars.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0903C2A0281C95920078E4F3 /* bars.pb.swift */; };
+		09B0D7622818FAD800714FA4 /* SwiftProtobuf in Frameworks */ = {isa = PBXBuildFile; productRef = 09B0D7612818FAD800714FA4 /* SwiftProtobuf */; };
 		09C2094527CD267300228DF7 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09C2094427CD267300228DF7 /* AppDelegate.swift */; };
 		09C2094727CD267300228DF7 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09C2094627CD267300228DF7 /* ViewController.swift */; };
 		09C2094927CD267500228DF7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 09C2094827CD267500228DF7 /* Assets.xcassets */; };
@@ -14,6 +16,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		0903C2A0281C95920078E4F3 /* bars.pb.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = bars.pb.swift; sourceTree = "<group>"; };
 		09C2094127CD267300228DF7 /* AutoFlowUI.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AutoFlowUI.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		09C2094427CD267300228DF7 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		09C2094627CD267300228DF7 /* ViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewController.swift; sourceTree = "<group>"; };
@@ -27,12 +30,21 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				09B0D7622818FAD800714FA4 /* SwiftProtobuf in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		09B0D75D2818F74D00714FA4 /* Protocol Buffer Objects */ = {
+			isa = PBXGroup;
+			children = (
+				0903C2A0281C95920078E4F3 /* bars.pb.swift */,
+			);
+			path = "Protocol Buffer Objects";
+			sourceTree = "<group>";
+		};
 		09C2093827CD267300228DF7 = {
 			isa = PBXGroup;
 			children = (
@@ -53,6 +65,7 @@
 			isa = PBXGroup;
 			children = (
 				09C2094427CD267300228DF7 /* AppDelegate.swift */,
+				09B0D75D2818F74D00714FA4 /* Protocol Buffer Objects */,
 				09C2094627CD267300228DF7 /* ViewController.swift */,
 				09C2094827CD267500228DF7 /* Assets.xcassets */,
 				09C2094A27CD267500228DF7 /* Main.storyboard */,
@@ -77,6 +90,9 @@
 			dependencies = (
 			);
 			name = AutoFlowUI;
+			packageProductDependencies = (
+				09B0D7612818FAD800714FA4 /* SwiftProtobuf */,
+			);
 			productName = AutoFlowUI;
 			productReference = 09C2094127CD267300228DF7 /* AutoFlowUI.app */;
 			productType = "com.apple.product-type.application";
@@ -105,6 +121,9 @@
 				Base,
 			);
 			mainGroup = 09C2093827CD267300228DF7;
+			packageReferences = (
+				09B0D7602818FAD800714FA4 /* XCRemoteSwiftPackageReference "swift-protobuf" */,
+			);
 			productRefGroup = 09C2094227CD267300228DF7 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -131,6 +150,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0903C2A1281C95920078E4F3 /* bars.pb.swift in Sources */,
 				09C2094727CD267300228DF7 /* ViewController.swift in Sources */,
 				09C2094527CD267300228DF7 /* AppDelegate.swift in Sources */,
 			);
@@ -341,6 +361,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		09B0D7602818FAD800714FA4 /* XCRemoteSwiftPackageReference "swift-protobuf" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-protobuf.git";
+			requirement = {
+				kind = exactVersion;
+				version = 1.9.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		09B0D7612818FAD800714FA4 /* SwiftProtobuf */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 09B0D7602818FAD800714FA4 /* XCRemoteSwiftPackageReference "swift-protobuf" */;
+			productName = SwiftProtobuf;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 09C2093927CD267300228DF7 /* Project object */;
 }

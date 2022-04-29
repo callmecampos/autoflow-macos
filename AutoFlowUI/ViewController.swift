@@ -58,10 +58,11 @@ class ViewController: NSViewController, NSComboBoxDelegate, NSGestureRecognizerD
     
     var currentArtist: String = ""
     var currentSong: String = ""
+    var currentSongProto: SongProto? // TODO: song proto should store artist information as well...??? like song name etc. oh shit we can make the metadata a proto hahaaaa hell yeah, that's separate maybe tho idk
     
     var server_url: String = "autoflow.ngrok.io"
     
-    var selectedSyllableRanges: [NSRange : String] = [:] // TODO: move this logic to another class or something - for now massive view controller is fine hahah just might get confusing
+    var selectedSyllableRanges: [NSRange : SyllableProto] = [:] // TODO: move this logic to another class or something - for now massive view controller is fine hahah just might get confusing
     
     // TODO: build super class representation of the Text View / Collection view
     
@@ -201,6 +202,8 @@ class ViewController: NSViewController, NSComboBoxDelegate, NSGestureRecognizerD
             let startCharacter = NSRange(location: tapPosition, length: 0)
             let wordRange = textView.selectionRange(forProposedRange: startCharacter, granularity: NSSelectionGranularity.selectByWord)
             
+            print(wordRange, wordRange.lowerBound, wordRange.upperBound)
+            
             /*
             guard let textRange = textView.textContainer?.textLayoutManager?.textRange(for: NSTextSelection.Granularity.word, enclosing: tapPosition as! NSTextLocation) else { print("failed 1"); return }
             
@@ -208,21 +211,49 @@ class ViewController: NSViewController, NSComboBoxDelegate, NSGestureRecognizerD
              */
             
             if let tappedSyllable = textView.attributedSubstring(forProposedRange: wordRange, actualRange: nil) {
-                print(wordRange.lowerBound, wordRange.upperBound, tappedSyllable.string)
+                print(wordRange.lowerBound, wordRange.upperBound, tappedSyllable.string, tappedSyllable.string.count)
                 if (tappedSyllable.string == " ") {
-                    print("Got space, dipping.")
+                    print("Got space, dipping.") // NOTE: should never happen -- hold on word for space before (or shift click)
                     return
                 }
+                
+                // TODO: syllable proto extraction
+                
+                // 1. find # endlines before wordRange == barproto index
+                let syllableText = textView.string
+                let syllableIndex = syllableText.index(syllableText.startIndex, offsetBy: wordRange.lowerBound)
+                let preText = syllableText.prefix(upTo: syllableIndex)
+                
+                let splitLines = preText.components(separatedBy: "\n")
+                let barIndex = splitLines.count - 1
+                
+                let syllLine = splitLines.last!.components(separatedBy: " ")
+                let syllIndex = syllLine.count - 1 // NOTE: for some reason you get a "" at the end of the list
+                print(barIndex, syllIndex)
+                
+                let barProto = currentSongProto!.bars[barIndex]
+                print(barProto)
+                let syllableProto = barProto.syllables[syllIndex]
+                print(syllableProto)
+                
+                // TODO: rename vars nicely
+                
+                // 2. get index of last endline
+                
+                // 3. number of words (spaces + 1) (-1 for index so just number of spaces lol) since last endline == syllable proto index
+                
+                // get syllable proto and check string equality --> add parent word check and add syllable (with wordRange for sorting later) to selectedSyllablesRanges -- now with new value type and same key type
+                
                 var alreadySelected: Bool = false
                 var adjacentToSelected: Bool = selectedSyllableRanges.count == 0
                 if (!commanded) {
                     adjacentToSelected = true
                     // consider: https://developer.apple.com/documentation/uikit/appearance_customization/supporting_dark_mode_in_your_interface
                     if (isDark) {
-                        print("DARK MODE")
+                        print("DARK MODE \(NSAppearance.currentDrawing().name)")
                         textView.setTextColor(.white, range: NSRange(location: 0, length: textView.textStorage!.length))
                     } else {
-                        print("OTHER SHIT: \(NSAppearance.currentDrawing().name)")
+                        print("LIGHT MODE: \(NSAppearance.currentDrawing().name)")
                         textView.setTextColor(.black, range: NSRange(location: 0, length: textView.textStorage!.length))
                     }
                     // textView.setTextColor(.black, range: NSRange(location: 0, length: textView.textStorage!.length))
@@ -245,12 +276,17 @@ class ViewController: NSViewController, NSComboBoxDelegate, NSGestureRecognizerD
                             print(_range.lowerBound - wordRange.upperBound)
                             print(wordRange.lowerBound - _range.upperBound)
                         }
+                        
+                        if (selectedSyllableRanges[_range]!.parentWord.id != syllableProto.parentWord.id) {
+                            print("Not same parent word")
+                            adjacentToSelected = false
+                        }
                     }
                 }
                 
                 if (adjacentToSelected) {
                     textView.setTextColor(.red, range: wordRange)
-                    selectedSyllableRanges[wordRange] = tappedSyllable.string
+                    selectedSyllableRanges[wordRange] = syllableProto
                     
                     // TODO: start adding logic for passing back improved syllabic information
                     
@@ -278,6 +314,8 @@ class ViewController: NSViewController, NSComboBoxDelegate, NSGestureRecognizerD
                  */
                 
                 // first annotation pass - syllables (or spaces) that fall on the beat!!! - nice we can get spaces easily lol thank god
+            } else {
+                print("failed to create attributed substring")
             }
         }
     }
@@ -292,7 +330,8 @@ class ViewController: NSViewController, NSComboBoxDelegate, NSGestureRecognizerD
             if let selectedSong = songDropdown.objectValueOfSelectedItem as? String {
                 if (currentSong != selectedSong) {
                     currentSong = selectedSong
-                    getSong(artist: currentArtist, song: currentSong)
+                    // getSong(artist: currentArtist, song: currentSong)
+                    getSongProto(artist: currentArtist, song: currentSong)
                 }
             }
         }
@@ -390,6 +429,7 @@ class ViewController: NSViewController, NSComboBoxDelegate, NSGestureRecognizerD
                             print("Got evaluation response: \(json)")
                             if let artists = json["songs"] as? [String : String] {
                                 print("Found songs")
+                                // TODO: maybe make these protod? repeated fields etc. and backend handles all the population etc.
                                 DispatchQueue.main.async { [self] in
                                     clearSlate(deselect: false)
                                     activeSongMap = [:]
@@ -416,7 +456,7 @@ class ViewController: NSViewController, NSComboBoxDelegate, NSGestureRecognizerD
         }
     }
     
-    func getSong(artist: String, song: String) {
+    func getSong(artist: String, song: String) { // NOTE: Deprecated
         if let artistId = artistMap[artist], let songId = activeSongMap[song] {
             let url: URL? = URL(string: "https://\(server_url)/get_song?artist=\(artistId)&song=\(songId)")
                     
@@ -444,12 +484,61 @@ class ViewController: NSViewController, NSComboBoxDelegate, NSGestureRecognizerD
                                 print(result)
                                 DispatchQueue.main.async { [self] in
                                     middleSyllableTextView.string = result
+                                    // TODO: receive proto'd results --> set bars proto
+                                    // TODO: callback that populates views with proto contents --> clicking a syllable gets its index in syllables array, gets parent word (and idx, checks it's the same for all -- this should happen live -- updates proto and sends back)
                                 }
                             } else {
                                 print("No saved syllabic analysis. Skipping.")
                             }
                         } catch {
                             print("Error when parsing JSON response: \(error.localizedDescription)")
+                        }
+                    } else {
+                        print(String(data: data!, encoding: .utf8) ?? "Not Found (Failed to decode response as string)") // TODO: should be detected client side?? give option to overwrite
+                    }
+                } else {
+                    print("Invalid HTTP response.")
+                }
+            }
+            task.resume()
+        }
+    }
+    
+    func getSongProto(artist: String, song: String) {
+        if let artistId = artistMap[artist], let songId = activeSongMap[song] {
+            let url: URL? = URL(string: "https://\(server_url)/get_song_proto?artist=\(artistId)&song=\(songId)")
+                    
+            let cachePolicy = URLRequest.CachePolicy.reloadIgnoringLocalCacheData
+            let request = MutableURLRequest(url: url! as URL, cachePolicy: cachePolicy, timeoutInterval: 10.0)
+            request.httpMethod = "GET"
+            
+            let session = URLSession.shared
+            let task = session.dataTask(with: request as URLRequest) { (data, response, error) in
+                if let httpResponse = response as? HTTPURLResponse {
+                    let status = httpResponse.statusCode
+                    print("Code \(status)")
+                    if status == 200 { // OK
+                        do {
+                            let song_proto = try SongProto(serializedData: data!)
+                            self.currentSongProto = song_proto // !!
+                            // print("Got song proto: \(song_proto)")
+                            
+                            // sweeet this works -- now i guess we just need helper functions for populating (maybe python side just adds them)
+                            
+                            DispatchQueue.main.async { [self] in
+                                // TODO: functions for populating views with relevant data from song proto (raw text actually seems to be important still.... with \ns and all)
+                                leftBarsTextView.string = song_proto.words // TODO: next, start devving on this and see how currentSongProto is helpful and if indexing isn't complicated and makes it easy to access syllable objects (and their parent words -- id is used just for checking if valid merge / split neighbors, as well as for passing back override objects... that is an important next step to scope out)
+                                // NOTE: high level, once you have syllabic parsing done, we can start thinking of some cooler stuff like what you've written down... annotating beat stresses provides a good prior on timing etc... some deep learning stuff to work on fs
+                            }
+                            
+                            DispatchQueue.main.async { [self] in
+                                // TODO: same as above but with syllables and allowing for tracking of indices and specifically which syllable you done tapped etc. (likely just by line index and syllable index...?)
+                                middleSyllableTextView.string = song_proto.syllables
+                                // TODO: receive proto'd results --> set bars proto
+                                // TODO: callback that populates views with proto contents --> clicking a syllable gets its index in syllables array, gets parent word (and idx, checks it's the same for all -- this should happen live -- updates proto and sends back)
+                            }
+                        } catch {
+                            print("Error when parsing JSON response: \(error.localizedDescription) \(response)")
                         }
                     } else {
                         print(String(data: data!, encoding: .utf8) ?? "Not Found (Failed to decode response as string)") // TODO: should be detected client side?? give option to overwrite
@@ -500,7 +589,7 @@ class ViewController: NSViewController, NSComboBoxDelegate, NSGestureRecognizerD
     }
     
     
-    @IBAction func runAnalysis(_ sender: Any) {
+    @IBAction func runAnalysis(_ sender: Any) { // TODO: delete this button
         runSyllabicAnalysis(artist: currentArtist, song: currentSong)
     }
     
@@ -523,12 +612,12 @@ class ViewController: NSViewController, NSComboBoxDelegate, NSGestureRecognizerD
                     let sortedRanges: [NSRange] = selectedSyllableRanges.keys.sorted(by: {$0.lowerBound < $1.lowerBound})
                     
                     
-                    var sortedSyllables: [String] = []
+                    var sortedSyllables: [SyllableProto] = []
                     var totalSyllables = ""
                     for (sortedRange) in sortedRanges {
                         let s = selectedSyllableRanges[sortedRange]!
                         sortedSyllables.append(s)
-                        totalSyllables += (s + " ")
+                        totalSyllables += (s.syllable + " ")
                     }
                     
                     totalSyllables.remove(at: totalSyllables.index(before: totalSyllables.endIndex)) // removes last space
@@ -537,21 +626,21 @@ class ViewController: NSViewController, NSComboBoxDelegate, NSGestureRecognizerD
                     print(sortedSyllables)
                     print(totalSyllables)
                     
-                    let a = NSAlert()
-                    a.messageText = "Syllable Parser Override"
-                    a.informativeText = "Edit the text below to modify the syllable parsing cache"
-                    a.addButton(withTitle: "Ok")
-                    a.addButton(withTitle: "Cancel")
-                    a.alertStyle = .informational
+                    let syllablicParsingEditingView = NSAlert()
+                    syllablicParsingEditingView.messageText = "Syllable Parser Override"
+                    syllablicParsingEditingView.informativeText = "Edit the text below to modify the syllable parsing cache"
+                    syllablicParsingEditingView.addButton(withTitle: "Ok")
+                    syllablicParsingEditingView.addButton(withTitle: "Cancel")
+                    syllablicParsingEditingView.alertStyle = .informational
                     
-                    let txt = NSTextField(frame: NSRect(x: 0, y: 0, width: 200, height: 24))
-                    txt.stringValue = totalSyllables
+                    let syllabicParsedText = NSTextField(frame: NSRect(x: 0, y: 0, width: 200, height: 24))
+                    syllabicParsedText.stringValue = totalSyllables
                     
-                    a.accessoryView = txt
-                    let response = a.runModal()
+                    syllablicParsingEditingView.accessoryView = syllabicParsedText
+                    let userResponse = syllablicParsingEditingView.runModal()
                     
-                    if (response == .alertFirstButtonReturn) {
-                        print("Here is new text: \(txt.stringValue)")
+                    if (userResponse == .alertFirstButtonReturn) {
+                        print("Here is new text: \(syllabicParsedText.stringValue)")
                     } else {
                         print("Canceled")
                     }
