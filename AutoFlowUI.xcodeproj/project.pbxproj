@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		0903C2A1281C95920078E4F3 /* bars.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0903C2A0281C95920078E4F3 /* bars.pb.swift */; };
+		0903C2A3281DAC7D0078E4F3 /* Utils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0903C2A2281DAC7D0078E4F3 /* Utils.swift */; };
 		09B0D7622818FAD800714FA4 /* SwiftProtobuf in Frameworks */ = {isa = PBXBuildFile; productRef = 09B0D7612818FAD800714FA4 /* SwiftProtobuf */; };
 		09C2094527CD267300228DF7 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09C2094427CD267300228DF7 /* AppDelegate.swift */; };
 		09C2094727CD267300228DF7 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09C2094627CD267300228DF7 /* ViewController.swift */; };
@@ -17,6 +18,7 @@
 
 /* Begin PBXFileReference section */
 		0903C2A0281C95920078E4F3 /* bars.pb.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = bars.pb.swift; sourceTree = "<group>"; };
+		0903C2A2281DAC7D0078E4F3 /* Utils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Utils.swift; sourceTree = "<group>"; };
 		09C2094127CD267300228DF7 /* AutoFlowUI.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AutoFlowUI.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		09C2094427CD267300228DF7 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		09C2094627CD267300228DF7 /* ViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewController.swift; sourceTree = "<group>"; };
@@ -70,6 +72,7 @@
 				09C2094827CD267500228DF7 /* Assets.xcassets */,
 				09C2094A27CD267500228DF7 /* Main.storyboard */,
 				09C2094D27CD267500228DF7 /* AutoFlowUI.entitlements */,
+				0903C2A2281DAC7D0078E4F3 /* Utils.swift */,
 			);
 			path = AutoFlowUI;
 			sourceTree = "<group>";
@@ -153,6 +156,7 @@
 				0903C2A1281C95920078E4F3 /* bars.pb.swift in Sources */,
 				09C2094727CD267300228DF7 /* ViewController.swift in Sources */,
 				09C2094527CD267300228DF7 /* AppDelegate.swift in Sources */,
+				0903C2A3281DAC7D0078E4F3 /* Utils.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

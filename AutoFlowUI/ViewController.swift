@@ -47,6 +47,8 @@ class ViewController: NSViewController, NSComboBoxDelegate, NSGestureRecognizerD
     @IBOutlet weak var artistDropdown: NSComboBox!
     @IBOutlet weak var songDropdown: NSComboBox!
     
+    @IBOutlet weak var annotationModeControl: NSSegmentedControl!
+    
     @IBOutlet weak var loadBarsButton: NSButton!
     
     var isLight: Bool { NSApp.effectiveAppearance.name == NSAppearance.Name.aqua }
@@ -87,8 +89,16 @@ class ViewController: NSViewController, NSComboBoxDelegate, NSGestureRecognizerD
         case Aligning
     }
     
+    enum AnnotationMode {
+        case None
+        case Syllabic
+        case Beat
+        case Rhymes
+    }
+    
+    var annotationMode: AnnotationMode = .None
+    
     var keyDownEventActive: Bool = false
-    var syllableEditing: Bool = false
     var tappingMode: TappingMode = .None // FIXME: start in None and then change with button
     var timeRef: Double? = nil
     var timeArray: [Double] = []
@@ -128,6 +138,9 @@ class ViewController: NSViewController, NSComboBoxDelegate, NSGestureRecognizerD
         let tap = NSClickGestureRecognizer(target: self, action: #selector(clickResponse(recognizer:)))
         middleSyllableTextView.isEditable = false
         middleSyllableTextView.addGestureRecognizer(tap)
+        
+        annotationMode = .None
+        annotationModeControl.selectedSegment = 0
         
         // TODO: analyze button that computes and reloads syllabic annotations once you've written a song
         // TODO: JSON response contains separate syllables field, and maybe separate annotations field for rhythm / pitch / duration / etc.
@@ -190,7 +203,7 @@ class ViewController: NSViewController, NSComboBoxDelegate, NSGestureRecognizerD
             }
         }
         
-        if (!syllableEditing) {
+        if (annotationMode != .Syllabic) {
             print("Not in syllable editing mode, dipping.")
             // TODO: this should clear state - again proper MVC logic will make this hella easy lol - at some point we should do that refactor - just first get basic logic down first - once we see diminishing returns with desirable functionality we can git commit and refactor checking same functionality
             return
@@ -330,8 +343,7 @@ class ViewController: NSViewController, NSComboBoxDelegate, NSGestureRecognizerD
             if let selectedSong = songDropdown.objectValueOfSelectedItem as? String {
                 if (currentSong != selectedSong) {
                     currentSong = selectedSong
-                    // getSong(artist: currentArtist, song: currentSong)
-                    getSongProto(artist: currentArtist, song: currentSong)
+                    getSongProto(artist: currentArtist, song: currentSong) // this is a tad bit slower but it's likely ok - could do non destructive updates to data model if we don't care about certain fields -- e.g. here we care about rendering but also *maybe* syllabic rendering -- so could just get lyrics / syllable fields immediately and asynchronously wait on getting the full rest of the proto -- same goes for song editing, don't need to send back whole thing necessarily -- TODO: add async proto ready option or something that fits this speed desire
                 }
             }
         }
@@ -347,9 +359,21 @@ class ViewController: NSViewController, NSComboBoxDelegate, NSGestureRecognizerD
     }
     
     
-    @IBAction func editModeSwitched(_ sender: NSSwitch) {
-        syllableEditing = !syllableEditing
-        print("Syllable Editing: \(syllableEditing)")
+    @IBAction func segmentedControlChanged(_ sender: NSSegmentedControl) {
+        switch annotationModeControl.selectedSegment {
+        case 0:
+            annotationMode = .None
+        case 1:
+            annotationMode = .Syllabic
+        case 2:
+            annotationMode = .Beat
+        case 3:
+            annotationMode = .Rhymes
+        default:
+            print("FATAL ERROR")
+        }
+        
+        print("Annotation mode set to \(annotationMode)")
     }
     
     override var representedObject: Any? {
@@ -538,7 +562,7 @@ class ViewController: NSViewController, NSComboBoxDelegate, NSGestureRecognizerD
                                 // TODO: callback that populates views with proto contents --> clicking a syllable gets its index in syllables array, gets parent word (and idx, checks it's the same for all -- this should happen live -- updates proto and sends back)
                             }
                         } catch {
-                            print("Error when parsing JSON response: \(error.localizedDescription) \(response)")
+                            print("Error when parsing JSON response: \(error.localizedDescription) \(String(describing: response))")
                         }
                     } else {
                         print(String(data: data!, encoding: .utf8) ?? "Not Found (Failed to decode response as string)") // TODO: should be detected client side?? give option to overwrite
@@ -551,49 +575,176 @@ class ViewController: NSViewController, NSComboBoxDelegate, NSGestureRecognizerD
         }
     }
     
-    func runSyllabicAnalysis(artist: String, song: String) {
+    func updateGlobalOverride(artist: String, song: String, overrideWordProto: WordProto, regenSong: Bool = true, force: Bool = false) {
         if let artistId = artistMap[artist], let songId = activeSongMap[song] {
-            let url: URL? = URL(string: "https://\(server_url)/analyze_song?artist=\(artistId)&song=\(songId)")
+            let url: URL? = URL(string: "https://\(server_url)/update_global_override?artist=\(artistId)&song=\(songId)&force=\(force)")
                     
             let cachePolicy = URLRequest.CachePolicy.reloadIgnoringLocalCacheData
+            
             let request = MutableURLRequest(url: url! as URL, cachePolicy: cachePolicy, timeoutInterval: 10.0)
-            request.httpMethod = "GET"
+            request.httpMethod = "POST"
+            request.httpBody = try! overrideWordProto.serializedData()
+            request.setValue("attachment/x-protobuf", forHTTPHeaderField: "Content-Type")
+            request.setValue("attachment/x-protobuf", forHTTPHeaderField: "Accept")
             
             let session = URLSession.shared
             let task = session.dataTask(with: request as URLRequest) { (data, response, error) in
                 if let httpResponse = response as? HTTPURLResponse {
                     let status = httpResponse.statusCode
-                    print("Code \(status)")
                     if status == 200 { // OK
-                        do {
-                            let json = try JSONSerialization.jsonObject(with: data!, options: []) as! [String: Any]
-                            print("Got evaluation response: \(json)")
-                            if let result = json["syllables"] as? String {
-                                print(result)
-                                DispatchQueue.main.async { [self] in
-                                    middleSyllableTextView.string = result
-                                }
-                            }
-                        } catch {
-                            print("Error when parsing JSON response: \(error.localizedDescription)")
+                        print("Successfully updated.")
+                        if regenSong {
+                            self.getSongProto(artist: artist, song: song)
                         }
                     } else {
-                        print(String(data: data!, encoding: .utf8) ?? "Not Found (Failed to decode response as string)") // TODO: should be detected client side?? give option to overwrite
+                        print("Failed response code: \(status)")
                     }
                 } else {
-                    print("Invalid HTTP response.")
+                  print("Invalid HTTP response.")
                 }
             }
             task.resume()
+            print("RETURNED")
         }
     }
     
-    
-    @IBAction func runAnalysis(_ sender: Any) { // TODO: delete this button
-        runSyllabicAnalysis(artist: currentArtist, song: currentSong)
+    func updateLocalOverride(artist: String, song: String, overrideWordProto: WordProto, regenSong: Bool = true, force: Bool = false) {
+        if let artistId = artistMap[artist], let songId = activeSongMap[song] {
+            let url: URL? = URL(string: "https://\(server_url)/update_local_override?artist=\(artistId)&song=\(songId)&force=\(force)")
+                    
+            let cachePolicy = URLRequest.CachePolicy.reloadIgnoringLocalCacheData
+            
+            let request = MutableURLRequest(url: url! as URL, cachePolicy: cachePolicy, timeoutInterval: 10.0)
+            request.httpMethod = "POST"
+            request.httpBody = try! overrideWordProto.serializedData()
+            request.setValue("attachment/x-protobuf", forHTTPHeaderField: "Content-Type")
+            request.setValue("attachment/x-protobuf", forHTTPHeaderField: "Accept")
+            
+            let session = URLSession.shared
+            let task = session.dataTask(with: request as URLRequest) { (data, response, error) in
+                if let httpResponse = response as? HTTPURLResponse {
+                    let status = httpResponse.statusCode
+                    if status == 200 { // OK
+                        print("Successfully updated.")
+                        if regenSong {
+                            self.getSongProto(artist: artist, song: song)
+                        }
+                    } else if status == 300 && !force { // Confirmation (with specifics in response maybe TODO)
+                        print("Failed, TODO: implement try again")
+                    } else {
+                        print("Failed response code: \(status)")
+                    }
+                } else {
+                  print("Invalid HTTP response.")
+                }
+            }
+            task.resume()
+            print("RETURNED")
+        }
     }
     
-    // TODO: some point soon we should do a pseudo-MVC refactor to make things easier - this will involve a day's worth of design, Friday?
+    // TODO: some point soon we should do a pseudo-MVC / MVVM refactor to make things easier - this will involve a day's worth of design, Friday?
+    
+    let WORD_LEVEL_SYLLABLE_EDITING = false
+    
+    func editSyllabicParsing(force: Bool = false) {
+        if (selectedSyllableRanges.count > 0) {
+            print("selected syllables: \(selectedSyllableRanges)")
+            // get syllables
+            var totalSyllables = ""
+            var parentWordProto = WordProto()
+            
+            if (!self.WORD_LEVEL_SYLLABLE_EDITING) {
+                let sortedRanges: [NSRange] = selectedSyllableRanges.keys.sorted(by: {$0.lowerBound < $1.lowerBound})
+                
+                var sortedSyllables: [SyllableProto] = [] // do we need this - probs not outside debugging print below
+                totalSyllables = ""
+                parentWordProto = WordProto()
+                for (sortedRange) in sortedRanges {
+                    let s = selectedSyllableRanges[sortedRange]!
+                    sortedSyllables.append(s)
+                    totalSyllables += (s.syllable + " ")
+                    if parentWordProto.hasID {
+                        assert(parentWordProto.id == s.parentWord.id)
+                    } else {
+                        parentWordProto.id = s.parentWord.id
+                        parentWordProto.word = s.parentWord.word
+                    }
+                }
+                
+                totalSyllables.remove(at: totalSyllables.index(before: totalSyllables.endIndex)) // removes last space
+            
+                print(sortedRanges)
+                print(sortedSyllables)
+            } else {
+                // TODO: select by word editing (either in word view or if you select a given syllable yeah)
+                // NOTE: for now just select every syllable lol
+            }
+            
+            print(totalSyllables)
+            
+            let syllabicParsingEditingView = NSAlert()
+            syllabicParsingEditingView.messageText = "Syllable Parser Override"
+            if !force {
+                syllabicParsingEditingView.informativeText = "Edit the text below to modify the syllable parsing cache"
+            } else {
+                syllabicParsingEditingView.informativeText = "Are you sure you want to "
+            }
+            syllabicParsingEditingView.addButton(withTitle: "Song-Local Update")
+            syllabicParsingEditingView.addButton(withTitle: "Global Update")
+            syllabicParsingEditingView.addButton(withTitle: "Cancel")
+            syllabicParsingEditingView.alertStyle = .informational
+            
+            let syllabicParsedText = NSTextField(frame: NSRect(x: 0, y: 0, width: 200, height: 24))
+            syllabicParsedText.stringValue = totalSyllables
+            
+            syllabicParsingEditingView.accessoryView = syllabicParsedText
+            let userResponse = syllabicParsingEditingView.runModal()
+            
+            let localUpdate = userResponse == .alertFirstButtonReturn
+            let globalUpdate = userResponse == .alertSecondButtonReturn
+            
+            if (globalUpdate || localUpdate) {
+                print("Here is new text: \(syllabicParsedText.stringValue)")
+                
+                let syllables = syllabicParsedText.stringValue.components(separatedBy: " ")
+                for syllable in syllables {
+                    if syllable == "" {
+                        print("Empty, ignoring")
+                        continue
+                    }
+                    
+                    var syllableProto = SyllableProto()
+                    syllableProto.syllable = syllable
+                    parentWordProto.syllables.append(syllableProto)
+                }
+                
+                // TODO: HTTP POST this word proto and then at the end regenerate the song!
+                
+                // TODO: figure out word specific override (gets wiped when lyrics get updated yeah... use lyrics hash!) -- for later, this is an edge case unless we run into it
+                
+                // META TODO: consolidate all the notes / comments you have here into a doc lol
+                
+                // TODO: for now overriding just fails - implement later and pass into calls --> need to reconstruct original attempt (maybe just call directly from update blah with a simple alert yeah that's def the way
+                
+                if localUpdate {
+                    updateLocalOverride(artist: currentArtist, song: currentSong, overrideWordProto: parentWordProto)
+                } else if globalUpdate {
+                    updateGlobalOverride(artist: currentArtist, song: currentSong, overrideWordProto: parentWordProto)
+                } // else if wordLevelUpdate -- separate implementation
+            } else {
+                print("Canceled")
+            }
+            
+            // show standard popup for editing syllables (when clicking, need to check that they are part of same parent word)
+            
+            // syllable editing popup --> shows syllables and allows just raw editing as you like, then returns parent word and those edited syllables (for now can just return edited syllables with original indices and everything else gets figured out) --> maybe this reruns syllabic analysis as a sanity check and to make this dev easier lol
+            
+            // Other TODO: server side for receiving syllable override updates (handles single and double dynamically via SyllableOverride class)
+            
+            // get parent word and syllables (parent word can get from raw syllable index - maybe happens server side we'll see)
+        }
+    }
     
     func keyDownEvent(event: NSEvent) -> NSEvent {
         if (keyDownEventActive) { // check if this fucks with timing stuff... shouldn't - also prolly not using that yet (could be cool to use for percussion flow type stuff - may be better way to capture this kind of input for timing too... ask X
@@ -604,55 +755,9 @@ class ViewController: NSViewController, NSComboBoxDelegate, NSGestureRecognizerD
         keyDownEventActive = true
         
         print("Key down \(event.keyCode)")
-        if (syllableEditing) {
+        if (annotationMode == .Syllabic) {
             if (event.keyCode == 36) { // enter key
-                if (selectedSyllableRanges.count > 0) {
-                    print("selected syllables: \(selectedSyllableRanges)")
-                    // get syllables
-                    let sortedRanges: [NSRange] = selectedSyllableRanges.keys.sorted(by: {$0.lowerBound < $1.lowerBound})
-                    
-                    
-                    var sortedSyllables: [SyllableProto] = []
-                    var totalSyllables = ""
-                    for (sortedRange) in sortedRanges {
-                        let s = selectedSyllableRanges[sortedRange]!
-                        sortedSyllables.append(s)
-                        totalSyllables += (s.syllable + " ")
-                    }
-                    
-                    totalSyllables.remove(at: totalSyllables.index(before: totalSyllables.endIndex)) // removes last space
-                    
-                    print(sortedRanges)
-                    print(sortedSyllables)
-                    print(totalSyllables)
-                    
-                    let syllablicParsingEditingView = NSAlert()
-                    syllablicParsingEditingView.messageText = "Syllable Parser Override"
-                    syllablicParsingEditingView.informativeText = "Edit the text below to modify the syllable parsing cache"
-                    syllablicParsingEditingView.addButton(withTitle: "Ok")
-                    syllablicParsingEditingView.addButton(withTitle: "Cancel")
-                    syllablicParsingEditingView.alertStyle = .informational
-                    
-                    let syllabicParsedText = NSTextField(frame: NSRect(x: 0, y: 0, width: 200, height: 24))
-                    syllabicParsedText.stringValue = totalSyllables
-                    
-                    syllablicParsingEditingView.accessoryView = syllabicParsedText
-                    let userResponse = syllablicParsingEditingView.runModal()
-                    
-                    if (userResponse == .alertFirstButtonReturn) {
-                        print("Here is new text: \(syllabicParsedText.stringValue)")
-                    } else {
-                        print("Canceled")
-                    }
-                    
-                    // show standard popup for editing syllables (when clicking, need to check that they are part of same parent word)
-                    
-                    // syllable editing popup --> shows syllables and allows just raw editing as you like, then returns parent word and those edited syllables (for now can just return edited syllables with original indices and everything else gets figured out) --> maybe this reruns syllabic analysis as a sanity check and to make this dev easier lol
-                    
-                    // Other TODO: server side for receiving syllable override updates (handles single and double dynamically via SyllableOverride class)
-                    
-                    // get parent word and syllables (parent word can get from raw syllable index - maybe happens server side we'll see)
-                }
+                editSyllabicParsing()
             }
         } else if (tappingMode == .Tapping) {
             // Key codes: https://stackoverflow.com/questions/28012566/swift-osx-key-event

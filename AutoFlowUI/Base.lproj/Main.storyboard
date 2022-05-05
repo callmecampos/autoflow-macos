@@ -825,24 +825,6 @@
                                     </objectValues>
                                 </comboBoxCell>
                             </comboBox>
-                            <button verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Ljh-my-36O">
-                                <rect key="frame" x="134" y="13" width="162" height="32"/>
-                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
-                                <buttonCell key="cell" type="push" title="Run Syllabic Analysis" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="iRA-Qu-duc">
-                                    <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
-                                    <font key="font" metaFont="system"/>
-                                </buttonCell>
-                                <connections>
-                                    <action selector="runAnalysis:" target="XfG-lQ-9wD" id="2J7-w3-cmL"/>
-                                </connections>
-                            </button>
-                            <switch horizontalHuggingPriority="750" verticalHuggingPriority="750" fixedFrame="YES" baseWritingDirection="leftToRight" alignment="left" translatesAutoresizingMaskIntoConstraints="NO" id="0Cr-IB-Z7j">
-                                <rect key="frame" x="610" y="16" width="42" height="25"/>
-                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
-                                <connections>
-                                    <action selector="editModeSwitched:" target="XfG-lQ-9wD" id="voI-x2-J8i"/>
-                                </connections>
-                            </switch>
                             <button verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="0Xb-PY-y7f">
                                 <rect key="frame" x="374" y="489" width="75" height="32"/>
                                 <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
@@ -865,9 +847,26 @@
                                     <action selector="reloadPressed:" target="XfG-lQ-9wD" id="a6j-jb-7Lc"/>
                                 </connections>
                             </button>
+                            <segmentedControl verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="yH9-RM-Afl">
+                                <rect key="frame" x="519" y="18" width="229" height="24"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                                <segmentedCell key="cell" borderStyle="border" alignment="left" style="rounded" trackingMode="selectOne" id="yp2-1Z-EgD">
+                                    <font key="font" metaFont="system"/>
+                                    <segments>
+                                        <segment label="None" width="54" selected="YES"/>
+                                        <segment label="Syllabic" width="54" tag="1"/>
+                                        <segment label="Beat" width="54"/>
+                                        <segment label="Rhyme"/>
+                                    </segments>
+                                </segmentedCell>
+                                <connections>
+                                    <action selector="segmentedControlChanged:" target="XfG-lQ-9wD" id="WKS-JF-zBa"/>
+                                </connections>
+                            </segmentedControl>
                         </subviews>
                     </view>
                     <connections>
+                        <outlet property="annotationModeControl" destination="yH9-RM-Afl" id="Rmt-82-ggP"/>
                         <outlet property="artistDropdown" destination="gdv-1x-vD6" id="1ec-6B-YNp"/>
                         <outlet property="beatTapButton" destination="0E1-bs-I2b" id="y0t-SM-4vZ"/>
                         <outlet property="leftBarsTextView" destination="8bK-4X-bzX" id="xql-bM-lmq"/>
