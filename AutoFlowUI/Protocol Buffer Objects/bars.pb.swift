@@ -27,6 +27,15 @@ struct SyllableProto {
 
   var syllable: String = String()
 
+  var barIndex: Int32 {
+    get {return _barIndex ?? 0}
+    set {_barIndex = newValue}
+  }
+  /// Returns true if `barIndex` has been explicitly set.
+  var hasBarIndex: Bool {return self._barIndex != nil}
+  /// Clears the value of `barIndex`. Subsequent reads from it will return its default value.
+  mutating func clearBarIndex() {self._barIndex = nil}
+
   var offset: Double {
     get {return _offset ?? 0}
     set {_offset = newValue}
@@ -63,14 +72,25 @@ struct SyllableProto {
   /// Clears the value of `parentWord`. Subsequent reads from it will return its default value.
   mutating func clearParentWord() {self._parentWord = nil}
 
+  var marked: Bool {
+    get {return _marked ?? false}
+    set {_marked = newValue}
+  }
+  /// Returns true if `marked` has been explicitly set.
+  var hasMarked: Bool {return self._marked != nil}
+  /// Clears the value of `marked`. Subsequent reads from it will return its default value.
+  mutating func clearMarked() {self._marked = nil}
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
 
+  fileprivate var _barIndex: Int32? = nil
   fileprivate var _offset: Double? = nil
   fileprivate var _duration: Double? = nil
   fileprivate var _pitch: Double? = nil
   fileprivate var _parentWord: WordProto? = nil
+  fileprivate var _marked: Bool? = nil
 }
 
 struct WordProto {
@@ -108,9 +128,30 @@ struct BarProto {
 
   var syllables: [SyllableProto] = []
 
+  var rawWords: String {
+    get {return _rawWords ?? String()}
+    set {_rawWords = newValue}
+  }
+  /// Returns true if `rawWords` has been explicitly set.
+  var hasRawWords: Bool {return self._rawWords != nil}
+  /// Clears the value of `rawWords`. Subsequent reads from it will return its default value.
+  mutating func clearRawWords() {self._rawWords = nil}
+
+  var rawSyllables: String {
+    get {return _rawSyllables ?? String()}
+    set {_rawSyllables = newValue}
+  }
+  /// Returns true if `rawSyllables` has been explicitly set.
+  var hasRawSyllables: Bool {return self._rawSyllables != nil}
+  /// Clears the value of `rawSyllables`. Subsequent reads from it will return its default value.
+  mutating func clearRawSyllables() {self._rawSyllables = nil}
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
+
+  fileprivate var _rawWords: String? = nil
+  fileprivate var _rawSyllables: String? = nil
 }
 
 struct SongProto {
@@ -118,27 +159,12 @@ struct SongProto {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
+  var artist: String = String()
+
+  var song: String = String()
+
   var bars: [BarProto] = []
 
-  var words: String {
-    get {return _words ?? String()}
-    set {_words = newValue}
-  }
-  /// Returns true if `words` has been explicitly set.
-  var hasWords: Bool {return self._words != nil}
-  /// Clears the value of `words`. Subsequent reads from it will return its default value.
-  mutating func clearWords() {self._words = nil}
-
-  var syllables: String {
-    get {return _syllables ?? String()}
-    set {_syllables = newValue}
-  }
-  /// Returns true if `syllables` has been explicitly set.
-  var hasSyllables: Bool {return self._syllables != nil}
-  /// Clears the value of `syllables`. Subsequent reads from it will return its default value.
-  mutating func clearSyllables() {self._syllables = nil}
-
-  /// any other metadata? get link where we build this in python & swift etc. (Ray Wenderlich)
   var audio: Data {
     get {return _audio ?? SwiftProtobuf.Internal.emptyData}
     set {_audio = newValue}
@@ -152,8 +178,6 @@ struct SongProto {
 
   init() {}
 
-  fileprivate var _words: String? = nil
-  fileprivate var _syllables: String? = nil
   fileprivate var _audio: Data? = nil
 }
 
@@ -163,20 +187,24 @@ extension SyllableProto: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
   static let protoMessageName: String = "SyllableProto"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "syllable"),
-    2: .same(proto: "offset"),
-    3: .same(proto: "duration"),
-    4: .same(proto: "pitch"),
-    5: .standard(proto: "parent_word"),
+    2: .standard(proto: "bar_index"),
+    3: .same(proto: "offset"),
+    4: .same(proto: "duration"),
+    5: .same(proto: "pitch"),
+    6: .standard(proto: "parent_word"),
+    7: .same(proto: "marked"),
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       switch fieldNumber {
       case 1: try decoder.decodeSingularStringField(value: &self.syllable)
-      case 2: try decoder.decodeSingularDoubleField(value: &self._offset)
-      case 3: try decoder.decodeSingularDoubleField(value: &self._duration)
-      case 4: try decoder.decodeSingularDoubleField(value: &self._pitch)
-      case 5: try decoder.decodeSingularMessageField(value: &self._parentWord)
+      case 2: try decoder.decodeSingularInt32Field(value: &self._barIndex)
+      case 3: try decoder.decodeSingularDoubleField(value: &self._offset)
+      case 4: try decoder.decodeSingularDoubleField(value: &self._duration)
+      case 5: try decoder.decodeSingularDoubleField(value: &self._pitch)
+      case 6: try decoder.decodeSingularMessageField(value: &self._parentWord)
+      case 7: try decoder.decodeSingularBoolField(value: &self._marked)
       default: break
       }
     }
@@ -186,27 +214,35 @@ extension SyllableProto: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
     if !self.syllable.isEmpty {
       try visitor.visitSingularStringField(value: self.syllable, fieldNumber: 1)
     }
-    if let v = self._offset {
-      try visitor.visitSingularDoubleField(value: v, fieldNumber: 2)
+    if let v = self._barIndex {
+      try visitor.visitSingularInt32Field(value: v, fieldNumber: 2)
     }
-    if let v = self._duration {
+    if let v = self._offset {
       try visitor.visitSingularDoubleField(value: v, fieldNumber: 3)
     }
-    if let v = self._pitch {
+    if let v = self._duration {
       try visitor.visitSingularDoubleField(value: v, fieldNumber: 4)
     }
+    if let v = self._pitch {
+      try visitor.visitSingularDoubleField(value: v, fieldNumber: 5)
+    }
     if let v = self._parentWord {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
+    }
+    if let v = self._marked {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 7)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: SyllableProto, rhs: SyllableProto) -> Bool {
     if lhs.syllable != rhs.syllable {return false}
+    if lhs._barIndex != rhs._barIndex {return false}
     if lhs._offset != rhs._offset {return false}
     if lhs._duration != rhs._duration {return false}
     if lhs._pitch != rhs._pitch {return false}
     if lhs._parentWord != rhs._parentWord {return false}
+    if lhs._marked != rhs._marked {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -258,6 +294,8 @@ extension BarProto: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationB
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "words"),
     2: .same(proto: "syllables"),
+    3: .standard(proto: "raw_words"),
+    4: .standard(proto: "raw_syllables"),
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -265,6 +303,8 @@ extension BarProto: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationB
       switch fieldNumber {
       case 1: try decoder.decodeRepeatedMessageField(value: &self.words)
       case 2: try decoder.decodeRepeatedMessageField(value: &self.syllables)
+      case 3: try decoder.decodeSingularStringField(value: &self._rawWords)
+      case 4: try decoder.decodeSingularStringField(value: &self._rawSyllables)
       default: break
       }
     }
@@ -277,12 +317,20 @@ extension BarProto: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationB
     if !self.syllables.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.syllables, fieldNumber: 2)
     }
+    if let v = self._rawWords {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
+    }
+    if let v = self._rawSyllables {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 4)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: BarProto, rhs: BarProto) -> Bool {
     if lhs.words != rhs.words {return false}
     if lhs.syllables != rhs.syllables {return false}
+    if lhs._rawWords != rhs._rawWords {return false}
+    if lhs._rawSyllables != rhs._rawSyllables {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -291,18 +339,18 @@ extension BarProto: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationB
 extension SongProto: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "SongProto"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "bars"),
-    2: .same(proto: "words"),
-    3: .same(proto: "syllables"),
+    1: .same(proto: "artist"),
+    2: .same(proto: "song"),
+    3: .same(proto: "bars"),
     4: .same(proto: "audio"),
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
       switch fieldNumber {
-      case 1: try decoder.decodeRepeatedMessageField(value: &self.bars)
-      case 2: try decoder.decodeSingularStringField(value: &self._words)
-      case 3: try decoder.decodeSingularStringField(value: &self._syllables)
+      case 1: try decoder.decodeSingularStringField(value: &self.artist)
+      case 2: try decoder.decodeSingularStringField(value: &self.song)
+      case 3: try decoder.decodeRepeatedMessageField(value: &self.bars)
       case 4: try decoder.decodeSingularBytesField(value: &self._audio)
       default: break
       }
@@ -310,14 +358,14 @@ extension SongProto: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.artist.isEmpty {
+      try visitor.visitSingularStringField(value: self.artist, fieldNumber: 1)
+    }
+    if !self.song.isEmpty {
+      try visitor.visitSingularStringField(value: self.song, fieldNumber: 2)
+    }
     if !self.bars.isEmpty {
-      try visitor.visitRepeatedMessageField(value: self.bars, fieldNumber: 1)
-    }
-    if let v = self._words {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
-    }
-    if let v = self._syllables {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
+      try visitor.visitRepeatedMessageField(value: self.bars, fieldNumber: 3)
     }
     if let v = self._audio {
       try visitor.visitSingularBytesField(value: v, fieldNumber: 4)
@@ -326,9 +374,9 @@ extension SongProto: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
   }
 
   static func ==(lhs: SongProto, rhs: SongProto) -> Bool {
+    if lhs.artist != rhs.artist {return false}
+    if lhs.song != rhs.song {return false}
     if lhs.bars != rhs.bars {return false}
-    if lhs._words != rhs._words {return false}
-    if lhs._syllables != rhs._syllables {return false}
     if lhs._audio != rhs._audio {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true

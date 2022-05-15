@@ -13,7 +13,7 @@ class ViewController: NSViewController, NSComboBoxDelegate, NSGestureRecognizerD
     @IBOutlet weak var leftBarsView: NSScrollView!
     @IBOutlet var leftBarsTextView: NSTextView!
     @IBOutlet var middleSyllableTextView: NSTextView!
-    @IBOutlet weak var rightRhythmView: NSScrollView!
+    @IBOutlet weak var rightRhythmView: NSScrollView! // for images generated in python - maybe clickable by pixel?
     // TODO: middle syllable view - syllables as buttons for merging - allow multi select and options etc. -- this is the meat for now
     // TODO: right image view? -- just notation - ideally buttons tho overlayed
     
@@ -37,6 +37,16 @@ class ViewController: NSViewController, NSComboBoxDelegate, NSGestureRecognizerD
     var currentSongProto: SongProto?
     
     var selectedSyllableRanges: [NSRange : SyllableProto] = [:]
+    
+    var syllableBeats: [SyllableProto?] = [] // use enum union type to represent syllable proto and or beat? or just make a wrapper (rapper lol) class
+    
+    let REST_SYMBOL: String = "§"
+    
+    /*
+     Rendering:
+     - show a meaningful ascii character for resets lol like a drum or sth idk
+     
+     */
     
     enum TappingMode {
         case None
@@ -101,7 +111,12 @@ class ViewController: NSViewController, NSComboBoxDelegate, NSGestureRecognizerD
         loadBarsButton.contentTintColor = .red
     }
     
-    @objc func clickResponse(recognizer: NSClickGestureRecognizer) {
+    func annotateBeat(recognizer: NSClickGestureRecognizer) {
+        /*
+         1. Annotate successive syllables (command click for beat before)
+         2. Update sensor field
+         */
+        
         let textView: NSTextView = middleSyllableTextView
         var commanded: Bool = false
         if let currentEvent = NSApp.currentEvent {
@@ -112,9 +127,84 @@ class ViewController: NSViewController, NSComboBoxDelegate, NSGestureRecognizerD
             }
         }
         
-        if (annotationMode != .Syllabic) {
-            print("Not in syllable editing mode, dipping.")
-            return
+        if recognizer.state == .ended {
+            let location: CGPoint = recognizer.location(in: textView)
+            let tapPosition = textView.characterIndexForInsertion(at: location)
+            let startCharacter = NSRange(location: tapPosition, length: 0)
+            let wordRange = textView.selectionRange(forProposedRange: startCharacter, granularity: .selectByWord)
+            
+            print(wordRange, wordRange.lowerBound, wordRange.upperBound)
+            
+            if let tappedSyllable = textView.attributedSubstring(forProposedRange: wordRange, actualRange: nil) {
+                print(wordRange.lowerBound, wordRange.upperBound, tappedSyllable.string, tappedSyllable.string.count)
+                if (tappedSyllable.string == " " || tappedSyllable.string == "\n") {
+                    print("Got \(tappedSyllable.string.debugDescription), dipping.") // NOTE: should never happen -- hold on word for space before (or shift click)
+                    return
+                }
+                
+                let syllableText = textView.string
+                let syllableIndex = syllableText.index(syllableText.startIndex, offsetBy: wordRange.lowerBound)
+                let preText = syllableText.prefix(upTo: syllableIndex)
+                
+                let splitLines = preText.components(separatedBy: "\n")
+                let barIndex = splitLines.count - 1
+
+                let syllIndex = splitLines.last!.components(separatedBy: " ").count - 1
+                
+                if (commanded) {
+                    // number of beats before or something (could have more than one before) - or maybe it just adds to index of previous? let's think about this representation - maybe sets the start of the syllable to be later ahhh ok this changes things
+                    // could just click it twice you feel (need a good way to visualize though so editor knows)
+                    
+                    // could add a character that gets rendered as a rest
+                    // also - may want to move away from this bars format, and just have one large chunk of lyrics with endlines...? what do you think? --> cuz it limits things to being same phrase and same line
+                    
+                    // scope out how this changes things
+                    
+                    var restProto = SyllableProto()
+                    restProto.syllable = REST_SYMBOL
+                    restProto.marked = true
+                    
+                    currentSongProto!.bars[barIndex].syllables.insert(restProto, at: syllIndex)
+                } else {
+                    // annotate this syllable (may need an intermediate representation, we'll see) --> think about how we do it handwritten
+                    
+                    /*
+                     Mark syllable - later solve rest indexing (effectivelly a no-op syllable)
+                     */
+                    
+                    print(currentSongProto!.bars[barIndex].syllables[syllIndex].marked)
+                    if (currentSongProto!.bars[barIndex].syllables[syllIndex].marked) {
+                        currentSongProto!.bars[barIndex].syllables[syllIndex].marked = false
+                        if (isDark) {
+                            print("DARK MODE \(NSAppearance.currentDrawing().name)")
+                            textView.setTextColor(.white, range: wordRange)
+                        } else {
+                            print("LIGHT MODE: \(NSAppearance.currentDrawing().name)")
+                            textView.setTextColor(.black, range: wordRange)
+                        }
+                    } else {
+                        currentSongProto!.bars[barIndex].syllables[syllIndex].marked = true
+                        print(currentSongProto!.bars[barIndex].syllables[syllIndex].marked)
+                        textView.setTextColor(.blue, range: wordRange)
+                    }
+                }
+            }
+        }
+    }
+    
+    func annotateRhyme(recognizer: NSClickGestureRecognizer) {
+        print("Rhyme annotation not implemented")
+    }
+    
+    func annotateSyllable(recognizer: NSClickGestureRecognizer) {
+        let textView: NSTextView = middleSyllableTextView
+        var commanded: Bool = false
+        if let currentEvent = NSApp.currentEvent {
+            print("click \(String(describing: currentEvent))")
+            if (currentEvent.modifierFlags.contains(.command)) {
+                print("commanded")
+                commanded = true
+            }
         }
         
         if recognizer.state == .ended {
@@ -133,37 +223,32 @@ class ViewController: NSViewController, NSComboBoxDelegate, NSGestureRecognizerD
             
             if let tappedSyllable = textView.attributedSubstring(forProposedRange: wordRange, actualRange: nil) {
                 print(wordRange.lowerBound, wordRange.upperBound, tappedSyllable.string, tappedSyllable.string.count)
-                if (tappedSyllable.string == " ") {
-                    print("Got space, dipping.") // NOTE: should never happen -- hold on word for space before (or shift click)
+                if (tappedSyllable.string == " " || tappedSyllable.string == "\n") {
+                    print("Got \(tappedSyllable.string.debugDescription), dipping.") // NOTE: should never happen -- hold on word for space before (or shift click)
                     return
                 }
                 
-                // TODO: syllable proto extraction
-                
-                // 1. find # endlines before wordRange == barproto index
                 let syllableText = textView.string
                 let syllableIndex = syllableText.index(syllableText.startIndex, offsetBy: wordRange.lowerBound)
                 let preText = syllableText.prefix(upTo: syllableIndex)
                 
                 let splitLines = preText.components(separatedBy: "\n")
                 let barIndex = splitLines.count - 1
+
+                let syllIndex = splitLines.last!.components(separatedBy: " ").count - 1
+                print(syllIndex)
                 
-                let syllLine = splitLines.last!.components(separatedBy: " ")
-                let syllIndex = syllLine.count - 1 // NOTE: for some reason you get a "" at the end of the list
-                print(barIndex, syllIndex)
                 
                 let barProto = currentSongProto!.bars[barIndex]
-                print(barProto)
                 let syllableProto = barProto.syllables[syllIndex]
                 print(syllableProto)
                 
                 // TODO: rename vars nicely
                 
-                // 2. get index of last endline
-                
-                // 3. number of words (spaces + 1) (-1 for index so just number of spaces lol) since last endline == syllable proto index
-                
-                // get syllable proto and check string equality --> add parent word check and add syllable (with wordRange for sorting later) to selectedSyllablesRanges -- now with new value type and same key type
+                if (tappedSyllable.string != syllableProto.syllable) {
+                    print("ERROR: no match between tapped syllable \(tappedSyllable.string.debugDescription) and extracted syllable \(syllableProto.syllable), quitting.")
+                    return
+                }
                 
                 var alreadySelected: Bool = false
                 var adjacentToSelected: Bool = selectedSyllableRanges.count == 0
@@ -215,6 +300,19 @@ class ViewController: NSViewController, NSComboBoxDelegate, NSGestureRecognizerD
         }
     }
     
+    @objc func clickResponse(recognizer: NSClickGestureRecognizer) {
+        switch annotationMode {
+        case .None:
+            print("No annotation mode set.")
+        case .Syllabic:
+            annotateSyllable(recognizer: recognizer)
+        case .Beat:
+            annotateBeat(recognizer: recognizer)
+        case .Rhymes:
+            annotateRhyme(recognizer: recognizer)
+        }
+    }
+    
     func getSongFromComboBox() {
         if let selectedArtist = artistDropdown.objectValueOfSelectedItem as? String {
             if (selectedArtist != currentArtist) {
@@ -242,6 +340,14 @@ class ViewController: NSViewController, NSComboBoxDelegate, NSGestureRecognizerD
     
     
     @IBAction func segmentedControlChanged(_ sender: NSSegmentedControl) {
+        if (isDark) {
+            print("DARK MODE \(NSAppearance.currentDrawing().name)")
+            middleSyllableTextView.setTextColor(.white, range: NSRange(location: 0, length: middleSyllableTextView.textStorage!.length))
+        } else {
+            print("LIGHT MODE: \(NSAppearance.currentDrawing().name)")
+            middleSyllableTextView.setTextColor(.black, range: NSRange(location: 0, length: middleSyllableTextView.textStorage!.length))
+        }
+        
         switch annotationModeControl.selectedSegment {
         case 0:
             annotationMode = .None
@@ -251,6 +357,39 @@ class ViewController: NSViewController, NSComboBoxDelegate, NSGestureRecognizerD
             annotationMode = .Beat
             // when this gets set --> save syllabic parsing
             // every time a beat gets set --> write proto to file (with substrate hash)
+            // TODO: load and render currently annotated beats (and rests) --> will have to handle rest annotation during indexing look up
+            var barIndexStart: Int = 0
+            for bar in currentSongProto!.bars {
+                var syllableIndexStart: Int = 0
+                for syllable in bar.syllables {
+                    if syllable.marked {
+                        let syllableRange = NSRange(location: barIndexStart + syllableIndexStart, length: syllable.syllable.count)
+                        middleSyllableTextView.setTextColor(.blue, range: syllableRange)
+                    }
+                    syllableIndexStart += syllable.syllable.count + 1 // space
+                }
+                
+                barIndexStart += bar.rawSyllables.count + 1 // endline... may be off by 1
+                
+                // TODO: totally move away from rawSyllables --> just autogenerate from raw repr and do the math (can ignore rests if you desire for other reprs)
+                
+                // it's not that much slower and I'm not sure I see the benefits since we can always auto-generate (per line or for range of lines helper fns or something in core.py)
+                
+                /*
+                 NEXT: rests implementation and rendering (and deleting) -- requires generation from repeated proto contents
+                 
+                 Once rests are implemented and tested:
+                 - Saving on server for state-ful representation and loading
+                 - Line by line overriding for editing and writing songs
+                 
+                 - Simple statistics with linear interpolation (e.g. syllables between beats on average with deviation per line per song etc., syllabic velocity throughout song, etc. -- look at notes!!!)
+                 
+                 - Tapping (quantized - defining a certain BPM --> subsequently speeding up and aligning with song to play with and show simple piano roll!!! then we start to get into interesting deep learning / module automation territory)
+                 
+                 - Piano roll from drums can start getting overlayed in interesting ways (ehh)
+                 - Think about ways this lets you go deeper from a production standpoint --> rhythm and rhyme schemes --> wordplay is another level of representation --> style --> storytelling --> else are out of the soul
+                 */
+            }
         case 3:
             annotationMode = .Rhymes
             // when this gets set --> save syllabic parsing
@@ -355,48 +494,6 @@ class ViewController: NSViewController, NSComboBoxDelegate, NSGestureRecognizerD
         }
     }
     
-    func getSong(artist: String, song: String) { // NOTE: Deprecated
-        if let artistId = artistMap[artist], let songId = activeSongMap[song] {
-            let request = ServerUtils.getRequest(domain: ServerUtils.getServerDomain(), endpoint: "get_song", args: ["artist" : artistId, "song" : songId])
-            
-            let session = URLSession.shared
-            let task = session.dataTask(with: request as URLRequest) { (data, response, error) in
-                if let httpResponse = response as? HTTPURLResponse {
-                    let responseStatus = ServerUtils.getStatus(httpResponse: httpResponse)
-                    switch responseStatus {
-                    case .OK:
-                        do {
-                            let json = try JSONSerialization.jsonObject(with: data!, options: []) as! [String: Any]
-                            print("Got evaluation response: \(json)")
-                            if let result = json["contents"] as? String {
-                                print(result)
-                                DispatchQueue.main.async { [self] in
-                                    leftBarsTextView.string = result
-                                }
-                            }
-                            
-                            if let result = json["syllables"] as? String {
-                                print(result)
-                                DispatchQueue.main.async { [self] in
-                                    middleSyllableTextView.string = result
-                                }
-                            } else {
-                                print("No saved syllabic analysis. Skipping.")
-                            }
-                        } catch {
-                            print("Error when parsing JSON response: \(error.localizedDescription)")
-                        }
-                    default:
-                        print("Bad status code: \(responseStatus)")
-                    }
-                } else {
-                    print("Invalid HTTP response.")
-                }
-            }
-            task.resume()
-        }
-    }
-    
     func getSongProto(artist: String, song: String) {
         if let artistId = artistMap[artist], let songId = activeSongMap[song] {
             let request = ServerUtils.getRequest(domain: ServerUtils.getServerDomain(), endpoint: "get_song_proto", args: ["artist" : artistId, "song" : songId])
@@ -412,8 +509,15 @@ class ViewController: NSViewController, NSComboBoxDelegate, NSGestureRecognizerD
                             self.currentSongProto = song_proto
                             
                             DispatchQueue.main.async { [self] in
-                                leftBarsTextView.string = song_proto.words
-                                middleSyllableTextView.string = song_proto.syllables
+                                leftBarsTextView.string = ""
+                                middleSyllableTextView.string = ""
+                                
+                                print("YOYOYO")
+                                for bar in song_proto.bars {
+                                    print(bar.rawWords)
+                                    leftBarsTextView.string += bar.rawWords + "\n"
+                                    middleSyllableTextView.string += bar.rawSyllables + "\n"
+                                }
                             }
                         } catch {
                             print("Error when parsing JSON response: \(error.localizedDescription) \(String(describing: response))")
