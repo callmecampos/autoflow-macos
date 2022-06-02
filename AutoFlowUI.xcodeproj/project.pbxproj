@@ -14,6 +14,8 @@
 		09C2094727CD267300228DF7 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09C2094627CD267300228DF7 /* ViewController.swift */; };
 		09C2094927CD267500228DF7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 09C2094827CD267500228DF7 /* Assets.xcassets */; };
 		09C2094C27CD267500228DF7 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 09C2094A27CD267500228DF7 /* Main.storyboard */; };
+		09D69ABB28481BE400B2BD38 /* AudioSpectrogram+AVCaptureAudioDataOutputSampleBufferDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09D69ABA28481BE400B2BD38 /* AudioSpectrogram+AVCaptureAudioDataOutputSampleBufferDelegate.swift */; };
+		09D69ABD28481C0300B2BD38 /* AudioSpectrogram.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09D69ABC28481C0300B2BD38 /* AudioSpectrogram.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -25,6 +27,8 @@
 		09C2094827CD267500228DF7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		09C2094B27CD267500228DF7 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		09C2094D27CD267500228DF7 /* AutoFlowUI.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AutoFlowUI.entitlements; sourceTree = "<group>"; };
+		09D69ABA28481BE400B2BD38 /* AudioSpectrogram+AVCaptureAudioDataOutputSampleBufferDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AudioSpectrogram+AVCaptureAudioDataOutputSampleBufferDelegate.swift"; sourceTree = "<group>"; };
+		09D69ABC28481C0300B2BD38 /* AudioSpectrogram.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioSpectrogram.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -73,6 +77,8 @@
 				09C2094A27CD267500228DF7 /* Main.storyboard */,
 				09C2094D27CD267500228DF7 /* AutoFlowUI.entitlements */,
 				0903C2A2281DAC7D0078E4F3 /* Utils.swift */,
+				09D69ABA28481BE400B2BD38 /* AudioSpectrogram+AVCaptureAudioDataOutputSampleBufferDelegate.swift */,
+				09D69ABC28481C0300B2BD38 /* AudioSpectrogram.swift */,
 			);
 			path = AutoFlowUI;
 			sourceTree = "<group>";
@@ -155,7 +161,9 @@
 			files = (
 				0903C2A1281C95920078E4F3 /* bars.pb.swift in Sources */,
 				09C2094727CD267300228DF7 /* ViewController.swift in Sources */,
+				09D69ABD28481C0300B2BD38 /* AudioSpectrogram.swift in Sources */,
 				09C2094527CD267300228DF7 /* AppDelegate.swift in Sources */,
+				09D69ABB28481BE400B2BD38 /* AudioSpectrogram+AVCaptureAudioDataOutputSampleBufferDelegate.swift in Sources */,
 				0903C2A3281DAC7D0078E4F3 /* Utils.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -303,6 +311,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSMainStoryboardFile = Main;
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Audio Recording & Analysis";
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -330,6 +339,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSMainStoryboardFile = Main;
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Audio Recording & Analysis";
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

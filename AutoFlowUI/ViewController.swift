@@ -40,7 +40,8 @@ class ViewController: NSViewController, NSComboBoxDelegate, NSGestureRecognizerD
     
     var syllableBeats: [SyllableProto?] = [] // use enum union type to represent syllable proto and or beat? or just make a wrapper (rapper lol) class
     
-    let REST_SYMBOL: String = "§"
+    let REST_SYMBOL: String = "Ø"
+    let COMP_REST_SYMBOL: String = "·"
     
     /*
      Rendering:
@@ -69,24 +70,12 @@ class ViewController: NSViewController, NSComboBoxDelegate, NSGestureRecognizerD
     var timeRef: Double? = nil
     var timeArray: [Double] = []
     
-    func clearSlate(deselect: Bool = true) {
-        leftBarsTextView.string = ""
-        middleSyllableTextView.string = ""
-        selectedSyllableRanges = [:]
+    let audioSpectrogram = AudioSpectrogram()
+    
+    override func viewWillAppear() {
+        super.viewWillAppear()
+
         
-        if (deselect) {
-            activeSongMap = [:]
-            songDropdown.removeAllItems()
-            songDropdown.reloadData()
-            songDropdown.deselectItem(at: songDropdown.indexOfSelectedItem)
-            currentSong = ""
-            
-            artistMap = [:]
-            artistDropdown.removeAllItems()
-            artistDropdown.reloadData()
-            artistDropdown.deselectItem(at: artistDropdown.indexOfSelectedItem)
-            currentArtist = ""
-        }
     }
     
     override func viewDidLoad() {
@@ -109,7 +98,58 @@ class ViewController: NSViewController, NSComboBoxDelegate, NSGestureRecognizerD
         annotationModeControl.selectedSegment = 0
         
         loadBarsButton.contentTintColor = .red
+        
+        rightRhythmView.wantsLayer = true
+
+        rightRhythmView.layer!.addSublayer(audioSpectrogram)
+        audioSpectrogram.frame = CGRect(origin: .zero,
+                                        size: rightRhythmView.frame.size)
+        
+        audioSpectrogram.startRunning()
     }
+    
+    func clearSlate(deselect: Bool = false) {
+        leftBarsTextView.string = ""
+        middleSyllableTextView.string = ""
+        selectedSyllableRanges = [:]
+        annotationModeControl.selectedSegment = 0 // set annotation mode to None
+        
+        if (deselect) {
+            activeSongMap = [:]
+            songDropdown.removeAllItems()
+            songDropdown.reloadData()
+            songDropdown.deselectItem(at: songDropdown.indexOfSelectedItem)
+            currentSong = ""
+            
+            artistMap = [:]
+            artistDropdown.removeAllItems()
+            artistDropdown.reloadData()
+            artistDropdown.deselectItem(at: artistDropdown.indexOfSelectedItem)
+            currentArtist = ""
+        }
+    }
+    
+    func regenerateText() {
+        leftBarsTextView.string = ""
+        middleSyllableTextView.string = ""
+        
+        for (bar_idx, bar) in currentSongProto!.bars.enumerated() {
+            for (i, word) in bar.words.enumerated() {
+                leftBarsTextView.string += word.word
+                leftBarsTextView.string += i == bar.words.count - 1 ? "\n" : " "
+            }
+            
+            for (i, syllable) in bar.syllables.enumerated() {
+                if (syllable.syllable == REST_SYMBOL) {
+                    print("Found rest at syllable \(i) at bar \(bar_idx)")
+                }
+                middleSyllableTextView.string += (syllable.syllable == REST_SYMBOL && annotationMode != .Beat) ? COMP_REST_SYMBOL : syllable.syllable
+                middleSyllableTextView.string += i == bar.syllables.count - 1 ? "\n" : " "
+            }
+        }
+    }
+    
+    // MARK: Annotation Logic
     
     func annotateBeat(recognizer: NSClickGestureRecognizer) {
         /*
@@ -119,27 +159,47 @@ class ViewController: NSViewController, NSComboBoxDelegate, NSGestureRecognizerD
         
         let textView: NSTextView = middleSyllableTextView
         var commanded: Bool = false
+        var shifted: Bool = false
         if let currentEvent = NSApp.currentEvent {
             print("click \(String(describing: currentEvent))")
             if (currentEvent.modifierFlags.contains(.command)) {
                 print("commanded")
                 commanded = true
             }
+            
+            if (currentEvent.modifierFlags.contains(.shift)) {
+                print("shifted")
+                shifted = true
+            }
+        }
+        
+        if commanded && shifted {
+            print("Not handled right now, skipping.")
+            return
         }
         
         if recognizer.state == .ended {
             let location: CGPoint = recognizer.location(in: textView)
             let tapPosition = textView.characterIndexForInsertion(at: location)
             let startCharacter = NSRange(location: tapPosition, length: 0)
-            let wordRange = textView.selectionRange(forProposedRange: startCharacter, granularity: .selectByWord)
+            var wordRange = textView.selectionRange(forProposedRange: startCharacter, granularity: .selectByWord)
             
             print(wordRange, wordRange.lowerBound, wordRange.upperBound)
             
-            if let tappedSyllable = textView.attributedSubstring(forProposedRange: wordRange, actualRange: nil) {
+            if let _tappedSyllable = textView.attributedSubstring(forProposedRange: wordRange, actualRange: nil) {
+                var tappedSyllable = _tappedSyllable
                 print(wordRange.lowerBound, wordRange.upperBound, tappedSyllable.string, tappedSyllable.string.count)
-                if (tappedSyllable.string == " " || tappedSyllable.string == "\n") {
-                    print("Got \(tappedSyllable.string.debugDescription), dipping.") // NOTE: should never happen -- hold on word for space before (or shift click)
-                    return
+                while (tappedSyllable.string == " " || tappedSyllable.string == "\n") {
+                    print("Got \(tappedSyllable.string.debugDescription), dipping.")
+                    
+                    wordRange = textView.selectionRange(forProposedRange: NSRange(location: tapPosition - 1, length: 0), granularity: .selectByWord)
+                    if let _newTappedSyllable = textView.attributedSubstring(forProposedRange: wordRange, actualRange: nil) {
+                        tappedSyllable = _newTappedSyllable
+                    } else {
+                        print("Invalid, returning.")
+                        return
+                    }
+                    print("New word: \(tappedSyllable.string)")
                 }
                 
                 let syllableText = textView.string
@@ -149,9 +209,13 @@ class ViewController: NSViewController, NSComboBoxDelegate, NSGestureRecognizerD
                 let splitLines = preText.components(separatedBy: "\n")
                 let barIndex = splitLines.count - 1
 
-                let syllIndex = splitLines.last!.components(separatedBy: " ").count - 1
+                var syllIndex = splitLines.last!.components(separatedBy: " ").count - 1
                 
-                if (commanded) {
+                if (commanded || shifted) {
+                    if (commanded) {
+                        syllIndex += 1
+                    }
+                    
                     // number of beats before or something (could have more than one before) - or maybe it just adds to index of previous? let's think about this representation - maybe sets the start of the syllable to be later ahhh ok this changes things
                     // could just click it twice you feel (need a good way to visualize though so editor knows)
                     
@@ -165,27 +229,62 @@ class ViewController: NSViewController, NSComboBoxDelegate, NSGestureRecognizerD
                     restProto.marked = true
                     
                     currentSongProto!.bars[barIndex].syllables.insert(restProto, at: syllIndex)
+                    
+                    regenerateText()
+                    
+                    var barIndexStart: Int = 0
+                    for bar in currentSongProto!.bars {
+                        var syllableIndexStart: Int = 0
+                        for syllable in bar.syllables {
+                            if syllable.marked {
+                                let syllableRange = NSRange(location: barIndexStart + syllableIndexStart, length: syllable.syllable.count)
+                                middleSyllableTextView.setTextColor(.green, range: syllableRange)
+                            }
+                            syllableIndexStart += syllable.syllable.count + 1 // space
+                        }
+                        
+                        barIndexStart += syllableIndexStart
+                    }
                 } else {
-                    // annotate this syllable (may need an intermediate representation, we'll see) --> think about how we do it handwritten
+                    // annotate this syllable (may need an intermediate representation, we'll see) --> think about how we do it handwritten ??
                     
                     /*
                      Mark syllable - later solve rest indexing (effectivelly a no-op syllable)
                      */
                     
-                    print(currentSongProto!.bars[barIndex].syllables[syllIndex].marked)
-                    if (currentSongProto!.bars[barIndex].syllables[syllIndex].marked) {
-                        currentSongProto!.bars[barIndex].syllables[syllIndex].marked = false
-                        if (isDark) {
-                            print("DARK MODE \(NSAppearance.currentDrawing().name)")
-                            textView.setTextColor(.white, range: wordRange)
+                    let selectedSyllable = currentSongProto!.bars[barIndex].syllables[syllIndex]
+                    if (selectedSyllable.marked) {
+                        if (selectedSyllable.syllable == REST_SYMBOL) {
+                            print("GOT REST SYMBOL")
+                            currentSongProto!.bars[barIndex].syllables.remove(at: syllIndex)
+                            
+                            regenerateText()
+                            
+                            var barIndexStart: Int = 0
+                            for bar in currentSongProto!.bars {
+                                var syllableIndexStart: Int = 0
+                                for syllable in bar.syllables {
+                                    if syllable.marked {
+                                        let syllableRange = NSRange(location: barIndexStart + syllableIndexStart, length: syllable.syllable.count)
+                                        middleSyllableTextView.setTextColor(.green, range: syllableRange)
+                                    }
+                                    syllableIndexStart += syllable.syllable.count + 1 // space
+                                }
+                                
+                                barIndexStart += syllableIndexStart
+                            }
                         } else {
-                            print("LIGHT MODE: \(NSAppearance.currentDrawing().name)")
-                            textView.setTextColor(.black, range: wordRange)
+                            currentSongProto!.bars[barIndex].syllables[syllIndex].marked = false
+                            if (isDark) { // TODO: inline if
+                                textView.setTextColor(.white, range: wordRange)
+                            } else {
+                                textView.setTextColor(.black, range: wordRange)
+                            }
                         }
                     } else {
                         currentSongProto!.bars[barIndex].syllables[syllIndex].marked = true
                         print(currentSongProto!.bars[barIndex].syllables[syllIndex].marked)
-                        textView.setTextColor(.blue, range: wordRange)
+                        textView.setTextColor(.green, range: wordRange)
                     }
                 }
             }
@@ -211,7 +310,7 @@ class ViewController: NSViewController, NSComboBoxDelegate, NSGestureRecognizerD
             let location: CGPoint = recognizer.location(in: textView)
             let tapPosition = textView.characterIndexForInsertion(at: location)
             let startCharacter = NSRange(location: tapPosition, length: 0)
-            let wordRange = textView.selectionRange(forProposedRange: startCharacter, granularity: NSSelectionGranularity.selectByWord)
+            var wordRange = textView.selectionRange(forProposedRange: startCharacter, granularity: NSSelectionGranularity.selectByWord)
             
             print(wordRange, wordRange.lowerBound, wordRange.upperBound)
             
@@ -221,11 +320,20 @@ class ViewController: NSViewController, NSComboBoxDelegate, NSGestureRecognizerD
             guard let rangeLength: Int = textView.textContentStorage?.offset(from: textRange.location, to: textRange.endLocation) else { print("failed 2"); return }
              */
             
-            if let tappedSyllable = textView.attributedSubstring(forProposedRange: wordRange, actualRange: nil) {
+            if let _tappedSyllable = textView.attributedSubstring(forProposedRange: wordRange, actualRange: nil) {
+                var tappedSyllable = _tappedSyllable
                 print(wordRange.lowerBound, wordRange.upperBound, tappedSyllable.string, tappedSyllable.string.count)
-                if (tappedSyllable.string == " " || tappedSyllable.string == "\n") {
-                    print("Got \(tappedSyllable.string.debugDescription), dipping.") // NOTE: should never happen -- hold on word for space before (or shift click)
-                    return
+                while (tappedSyllable.string == " " || tappedSyllable.string == "\n") {
+                    print("Got \(tappedSyllable.string.debugDescription), dipping.")
+                    
+                    wordRange = textView.selectionRange(forProposedRange: NSRange(location: tapPosition - 1, length: 0), granularity: .selectByWord)
+                    if let _newTappedSyllable = textView.attributedSubstring(forProposedRange: wordRange, actualRange: nil) {
+                        tappedSyllable = _newTappedSyllable
+                    } else {
+                        print("Invalid, returning.")
+                        return
+                    }
+                    print("New word: \(tappedSyllable.string)")
                 }
                 
                 let syllableText = textView.string
@@ -238,7 +346,6 @@ class ViewController: NSViewController, NSComboBoxDelegate, NSGestureRecognizerD
                 let syllIndex = splitLines.last!.components(separatedBy: " ").count - 1
                 print(syllIndex)
                 
-                
                 let barProto = currentSongProto!.bars[barIndex]
                 let syllableProto = barProto.syllables[syllIndex]
                 print(syllableProto)
@@ -250,19 +357,22 @@ class ViewController: NSViewController, NSComboBoxDelegate, NSGestureRecognizerD
                     return
                 }
                 
+                if (syllableProto.syllable == REST_SYMBOL) {
+                    print("Selected rest syllable, ignoring. WARNING: This is a weird mode to be in...")
+                    return
+                }
+                
                 var alreadySelected: Bool = false
                 var adjacentToSelected: Bool = selectedSyllableRanges.count == 0
                 if (!commanded) {
                     adjacentToSelected = true
                     // consider: https://developer.apple.com/documentation/uikit/appearance_customization/supporting_dark_mode_in_your_interface
+                    // TODO: inline if
                     if (isDark) {
-                        print("DARK MODE \(NSAppearance.currentDrawing().name)")
                         textView.setTextColor(.white, range: NSRange(location: 0, length: textView.textStorage!.length))
                     } else {
-                        print("LIGHT MODE: \(NSAppearance.currentDrawing().name)")
                         textView.setTextColor(.black, range: NSRange(location: 0, length: textView.textStorage!.length))
                     }
-                    // textView.setTextColor(.black, range: NSRange(location: 0, length: textView.textStorage!.length))
                     
                     alreadySelected = selectedSyllableRanges.keys.contains(wordRange)
                         
@@ -334,42 +444,49 @@ class ViewController: NSViewController, NSComboBoxDelegate, NSGestureRecognizerD
     }
     
     @IBAction func reloadPressed(_ sender: NSButton) {
-        clearSlate()
+        clearSlate(deselect: true)
         getArtists()
     }
     
     
     @IBAction func segmentedControlChanged(_ sender: NSSegmentedControl) {
-        if (isDark) {
-            print("DARK MODE \(NSAppearance.currentDrawing().name)")
+        if (currentSongProto == nil) {
+            return
+        }
+            
+        if (isDark) { // TODO: inline if
             middleSyllableTextView.setTextColor(.white, range: NSRange(location: 0, length: middleSyllableTextView.textStorage!.length))
         } else {
-            print("LIGHT MODE: \(NSAppearance.currentDrawing().name)")
             middleSyllableTextView.setTextColor(.black, range: NSRange(location: 0, length: middleSyllableTextView.textStorage!.length))
         }
         
         switch annotationModeControl.selectedSegment {
         case 0:
             annotationMode = .None
+            regenerateText()
         case 1:
             annotationMode = .Syllabic
+            regenerateText()
         case 2:
             annotationMode = .Beat
             // when this gets set --> save syllabic parsing
             // every time a beat gets set --> write proto to file (with substrate hash)
             // TODO: load and render currently annotated beats (and rests) --> will have to handle rest annotation during indexing look up
+            
+            regenerateText()
+            
             var barIndexStart: Int = 0
             for bar in currentSongProto!.bars {
                 var syllableIndexStart: Int = 0
                 for syllable in bar.syllables {
                     if syllable.marked {
                         let syllableRange = NSRange(location: barIndexStart + syllableIndexStart, length: syllable.syllable.count)
-                        middleSyllableTextView.setTextColor(.blue, range: syllableRange)
+                        middleSyllableTextView.setTextColor(.green, range: syllableRange)
                     }
                     syllableIndexStart += syllable.syllable.count + 1 // space
                 }
                 
-                barIndexStart += bar.rawSyllables.count + 1 // endline... may be off by 1
+                barIndexStart += syllableIndexStart // endline... may be off by 1
                 
                 // TODO: totally move away from rawSyllables --> just autogenerate from raw repr and do the math (can ignore rests if you desire for other reprs)
                 
@@ -392,6 +509,7 @@ class ViewController: NSViewController, NSComboBoxDelegate, NSGestureRecognizerD
             }
         case 3:
             annotationMode = .Rhymes
+            regenerateText()
             // when this gets set --> save syllabic parsing
             // every time a rhyme gets set --> write proto to file (with substrate hash)
         default:
@@ -469,7 +587,7 @@ class ViewController: NSViewController, NSComboBoxDelegate, NSGestureRecognizerD
                                 print("Found songs")
                                 // TODO: maybe make these protod? repeated fields etc. and backend handles all the population etc.
                                 DispatchQueue.main.async { [self] in
-                                    clearSlate(deselect: false)
+                                    clearSlate()
                                     activeSongMap = [:]
                                     songDropdown.removeAllItems()
                                     for (songId, songName) in artists {
@@ -509,15 +627,8 @@ class ViewController: NSViewController, NSComboBoxDelegate, NSGestureRecognizerD
                             self.currentSongProto = song_proto
                             
                             DispatchQueue.main.async { [self] in
-                                leftBarsTextView.string = ""
-                                middleSyllableTextView.string = ""
-                                
-                                print("YOYOYO")
-                                for bar in song_proto.bars {
-                                    print(bar.rawWords)
-                                    leftBarsTextView.string += bar.rawWords + "\n"
-                                    middleSyllableTextView.string += bar.rawSyllables + "\n"
-                                }
+                                clearSlate()
+                                regenerateText()
                             }
                         } catch {
                             print("Error when parsing JSON response: \(error.localizedDescription) \(String(describing: response))")
